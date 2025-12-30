@@ -414,6 +414,16 @@ $employees = $stmt->fetchAll();
             </div>
             <form method="POST" action="">
                 <div class="modal-body">
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Default Passwords</h6>
+                        <ul class="mb-0">
+                            <li><strong>Student Default Password:</strong> <code>student123</code></li>
+                            <li><strong>Lecturer Default Password:</strong> <code>lecturer123</code></li>
+                        </ul>
+                        <hr class="my-2">
+                        <small class="text-muted">Users must change their password on first login. Make sure to share the temporary password securely.</small>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">User ID *</label>
                         <input type="text" class="form-control" name="user_id" 
