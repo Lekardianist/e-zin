@@ -27,28 +27,22 @@ $total_students = $stmt->fetch()['total'];
 
 // Total permissions from lecturer's students
 $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM permissions p 
-                      JOIN employees e ON p.user_id = e.user_id 
-                      WHERE e.role = 'student' 
-                      AND (e.department = ? OR e.subject LIKE ?)");
-$stmt->execute([$lecturer['department'], '%' . $lecturer['subject'] . '%']);
+                      WHERE p.lecturer_id = ?");
+$stmt->execute([$_SESSION['user_id']]);
 $total_permissions = $stmt->fetch()['total'];
 
 // Pending permissions from lecturer's students
 $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM permissions p 
-                      JOIN employees e ON p.user_id = e.user_id 
-                      WHERE e.role = 'student' 
-                      AND (e.department = ? OR e.subject LIKE ?)
+                      WHERE p.lecturer_id = ?
                       AND p.status = 'pending'");
-$stmt->execute([$lecturer['department'], '%' . $lecturer['subject'] . '%']);
+$stmt->execute([$_SESSION['user_id']]);
 $pending_permissions = $stmt->fetch()['total'];
 
 // Approved permissions from lecturer's students
 $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM permissions p 
-                      JOIN employees e ON p.user_id = e.user_id 
-                      WHERE e.role = 'student' 
-                      AND (e.department = ? OR e.subject LIKE ?)
+                      WHERE p.lecturer_id = ?
                       AND p.status = 'approved'");
-$stmt->execute([$lecturer['department'], '%' . $lecturer['subject'] . '%']);
+$stmt->execute([$_SESSION['user_id']]);
 $approved_permissions = $stmt->fetch()['total'];
 ?>
 
@@ -144,10 +138,9 @@ $approved_permissions = $stmt->fetch()['total'];
                     <?php
                     $stmt = $pdo->prepare("SELECT p.*, e.name, e.user_id FROM permissions p 
                                           JOIN employees e ON p.user_id = e.user_id 
-                                          WHERE e.role = 'student' 
-                                          AND (e.department = ? OR e.subject LIKE ?)
+                                          WHERE p.lecturer_id = ?
                                           ORDER BY p.created_at DESC LIMIT 5");
-                    $stmt->execute([$lecturer['department'], '%' . $lecturer['subject'] . '%']);
+                    $stmt->execute([$_SESSION['user_id']]);
                     $permissions = $stmt->fetchAll();
                     
                     if (count($permissions) > 0):

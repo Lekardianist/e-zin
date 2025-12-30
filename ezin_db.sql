@@ -81,6 +81,7 @@ INSERT INTO `employees` (`id`, `user_id`, `name`, `email`, `subject`, `role`, `p
 CREATE TABLE `permissions` (
   `id` int(11) NOT NULL,
   `user_id` varchar(50) DEFAULT NULL,
+  `lecturer_id` varchar(50) DEFAULT NULL,
   `name` varchar(100) DEFAULT NULL,
   `role` enum('lecturer','staff','student') DEFAULT NULL,
   `permission_type` varchar(100) DEFAULT NULL,
@@ -91,7 +92,8 @@ CREATE TABLE `permissions` (
   `end_date` date DEFAULT NULL,
   `attachment_file` varchar(255) DEFAULT NULL,
   `file_type` varchar(50) DEFAULT NULL,
-  `file_size` int(11) DEFAULT NULL
+  `file_size` int(11) DEFAULT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

@@ -1,33 +1,50 @@
 <?php
-require_once 'includes/header.php';
+// ===========================
+// DATABASE CONNECTION
+// ===========================
+require_once '../config/database.php'; // pastikan $pdo ada di sini
 
-/* ===========================
-   HANDLE APPROVE / REJECT
-=========================== */
+// Start session early and ensure user is lecturer before any redirect/output
+if (session_status() === PHP_SESSION_NONE) session_start();
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'lecturer') {
+    header('Location: ../index.php');
+    exit();
+}
+
+// ===========================
+// HANDLE APPROVE / REJECT (run before any HTML output)
+// ===========================
 if (isset($_GET['action'], $_GET['id'])) {
     if (in_array($_GET['action'], ['approve', 'reject'])) {
         $status = $_GET['action'] === 'approve' ? 'approved' : 'rejected';
+
         $stmt = $pdo->prepare("UPDATE permissions SET status = ? WHERE id = ?");
         $stmt->execute([$status, $_GET['id']]);
+
         header("Location: permissions.php?updated=1");
         exit;
     }
 }
 
-/* ===========================
-   SEARCH & FILTER
-=========================== */
+// ===========================
+// LOAD HEADER (START SESSION + render)
+// ===========================
+require_once 'includes/header.php';
+
+// ===========================
+// SEARCH & FILTER
+// ===========================
 $search = $_GET['search'] ?? '';
 $filter = $_GET['filter'] ?? 'all';
 
 $query = "SELECT p.*, e.name, e.email 
           FROM permissions p
           JOIN employees e ON p.user_id = e.user_id
-          WHERE e.role = 'student'";
+          WHERE e.role = 'student' AND p.lecturer_id = ?";
 
-$params = [];
+$params = [$_SESSION['user_id']];
 
-if ($search) {
+if (!empty($search)) {
     $query .= " AND (
         e.name LIKE ? OR 
         e.email LIKE ? OR 
@@ -35,7 +52,7 @@ if ($search) {
         p.detail_permission LIKE ?
     )";
     $searchTerm = "%$search%";
-    array_push($params, $searchTerm, $searchTerm, $searchTerm, $searchTerm);
+    $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
 }
 
 if ($filter !== 'all') {
@@ -44,6 +61,7 @@ if ($filter !== 'all') {
 }
 
 $query .= " ORDER BY p.created_at DESC";
+
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $permissions = $stmt->fetchAll();
@@ -54,13 +72,18 @@ $permissions = $stmt->fetchAll();
 <h2 class="mb-3">Permission Management</h2>
 
 <?php if (isset($_GET['updated'])): ?>
-<div class="alert alert-success">Permission updated successfully</div>
+<div class="alert alert-success">
+    Permission updated successfully
+</div>
 <?php endif; ?>
 
 <form method="get" class="row g-2 mb-3">
     <div class="col-md-8">
-        <input type="text" name="search" class="form-control"
-               placeholder="Search..." value="<?= htmlspecialchars($search) ?>">
+        <input type="text"
+               name="search"
+               class="form-control"
+               placeholder="Search..."
+               value="<?= htmlspecialchars($search) ?>">
     </div>
     <div class="col-md-3">
         <select name="filter" class="form-select" onchange="this.form.submit()">
@@ -93,21 +116,26 @@ $permissions = $stmt->fetchAll();
 <?php foreach ($permissions as $p): ?>
 <tr>
 <td><?= date('d M Y H:i', strtotime($p['created_at'])) ?></td>
+
 <td>
     <strong><?= htmlspecialchars($p['name']) ?></strong><br>
     <small><?= htmlspecialchars($p['email']) ?></small>
 </td>
-<td><?= $p['permission_type'] ?></td>
+
+<td><?= htmlspecialchars($p['permission_type']) ?></td>
+
 <td>
-    <span class="badge bg-<?= 
-        $p['status']=='approved'?'success':($p['status']=='rejected'?'danger':'warning') ?>">
+    <span class="badge bg-<?=
+        $p['status'] === 'approved' ? 'success' :
+        ($p['status'] === 'rejected' ? 'danger' : 'warning')
+    ?>">
         <?= ucfirst($p['status']) ?>
     </span>
 </td>
+
 <td>
 <div class="btn-group btn-group-sm">
 
-<!-- VIEW BUTTON FIXED -->
 <button class="btn btn-info"
         data-bs-toggle="modal"
         data-bs-target="#modal-<?= $p['id'] ?>">
@@ -116,12 +144,13 @@ $permissions = $stmt->fetchAll();
 
 <?php if ($p['status'] === 'pending'): ?>
 <a class="btn btn-success"
-   onclick="return confirm('Approve?')"
+   onclick="return confirm('Approve this permission?')"
    href="?action=approve&id=<?= $p['id'] ?>">
    Approve
 </a>
+
 <a class="btn btn-danger"
-   onclick="return confirm('Reject?')"
+   onclick="return confirm('Reject this permission?')"
    href="?action=reject&id=<?= $p['id'] ?>">
    Reject
 </a>
@@ -136,7 +165,9 @@ $permissions = $stmt->fetchAll();
 </table>
 </div>
 <?php else: ?>
-<p class="text-muted text-center py-5">No permission requests found.</p>
+<p class="text-muted text-center py-5">
+    No permission requests found.
+</p>
 <?php endif; ?>
 
 </div>
@@ -157,15 +188,15 @@ $permissions = $stmt->fetchAll();
 <div class="modal-body">
 <p><strong>Name:</strong> <?= htmlspecialchars($p['name']) ?></p>
 <p><strong>Email:</strong> <?= htmlspecialchars($p['email']) ?></p>
-<p><strong>Type:</strong> <?= $p['permission_type'] ?></p>
+<p><strong>Type:</strong> <?= htmlspecialchars($p['permission_type']) ?></p>
 <p><strong>Status:</strong> <?= ucfirst($p['status']) ?></p>
 <hr>
 <p><?= nl2br(htmlspecialchars($p['detail_permission'])) ?></p>
 
-<?php if ($p['attachment_file']): ?>
+<?php if (!empty($p['attachment_file'])): ?>
 <hr>
 <a class="btn btn-outline-primary"
-   href="../uploads/permissions/<?= $p['attachment_file'] ?>"
+   href="../uploads/permissions/<?= htmlspecialchars($p['attachment_file']) ?>"
    target="_blank">
    <i class="bi bi-paperclip"></i> View Attachment
 </a>

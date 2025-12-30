@@ -2,168 +2,226 @@
 require_once 'includes/header.php';
 require_once 'config/database.php';
 
-// Pastikan kolom status ada di tabel users
+/* ===========================
+   PASTIKAN KOLOM STATUS ADA
+=========================== */
 try {
-    $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS status ENUM('active', 'inactive') DEFAULT 'active'");
+    $pdo->exec("
+        ALTER TABLE users 
+        ADD COLUMN IF NOT EXISTS status 
+        ENUM('active','inactive') DEFAULT 'active'
+    ");
 } catch (PDOException $e) {
-    // Kolom mungkin sudah ada, lanjutkan
+    // Abaikan jika sudah ada
 }
 
-// Handle add employee
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_employee'])) {
-    $user_id = $_POST['user_id'];
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $phone = $_POST['phone'];
-    $subject = $_POST['subject'];
+/* ===========================
+   TAMBAH / UPDATE EMPLOYEE
+=========================== */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
+
+    $user_id    = $_POST['user_id'];
+    $name       = $_POST['name'];
+    $email      = $_POST['email'];
+    $phone      = $_POST['phone'];
+    $subject    = $_POST['subject'];
     $department = $_POST['department'];
-    $role = $_POST['role'];
-    
+    $role       = $_POST['role'];
+
     try {
-        // Start transaction
         $pdo->beginTransaction();
-        
-        // First, add to users table if not exists
-        $checkUser = $pdo->prepare("SELECT COUNT(*) FROM users WHERE user_id = ? OR email = ?");
+
+        /* ===========================
+           CEK USER
+        =========================== */
+        $checkUser = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM users 
+            WHERE user_id = ? OR email = ?
+        ");
         $checkUser->execute([$user_id, $email]);
         $userExists = $checkUser->fetchColumn();
-        
-        if ($userExists == 0) {
-            // Insert into users table
-            $userStmt = $pdo->prepare("INSERT INTO users (user_id, name, email, password, role, status) 
-                                      VALUES (?, ?, ?, ?, ?, 'active')");
-            $defaultPassword = md5('password123'); // Default password
-            $userStmt->execute([$user_id, $name, $email, $defaultPassword, $role]);
-        } else {
-            // Update existing user
-            $userStmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE user_id = ?");
-            $userStmt->execute([$name, $email, $role, $user_id]);
+
+        /* ===========================
+           PASSWORD DEFAULT BY ROLE
+        =========================== */
+        switch ($role) {
+            case 'lecturer':
+                $plainPassword = 'lecturer123';
+                break;
+            case 'student':
+                $plainPassword = 'student123';
+                break;
+            case 'staff':
+                $plainPassword = 'staff123';
+                break;
+            default:
+                $plainPassword = 'password123';
         }
-        
-        // Check if employee already exists
-        $checkEmp = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE user_id = ?");
+
+        $defaultPassword = md5($plainPassword);
+
+        /* ===========================
+           INSERT / UPDATE USERS
+        =========================== */
+        if ($userExists == 0) {
+
+            $userStmt = $pdo->prepare("
+                INSERT INTO users 
+                (user_id, name, email, password, role, status)
+                VALUES (?, ?, ?, ?, ?, 'active')
+            ");
+            $userStmt->execute([
+                $user_id,
+                $name,
+                $email,
+                $defaultPassword,
+                $role
+            ]);
+
+        } else {
+
+            $userStmt = $pdo->prepare("
+                UPDATE users 
+                SET name = ?, email = ?, role = ?
+                WHERE user_id = ?
+            ");
+            $userStmt->execute([
+                $name,
+                $email,
+                $role,
+                $user_id
+            ]);
+        }
+
+        /* ===========================
+           CEK EMPLOYEE
+        =========================== */
+        $checkEmp = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM employees 
+            WHERE user_id = ?
+        ");
         $checkEmp->execute([$user_id]);
         $empExists = $checkEmp->fetchColumn();
-        
+
         if ($empExists == 0) {
-            // Insert into employees table
-            $stmt = $pdo->prepare("INSERT INTO employees (user_id, name, email, phone, subject, department, role) 
-                                   VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$user_id, $name, $email, $phone, $subject, $department, $role]);
-            
+
+            $stmt = $pdo->prepare("
+                INSERT INTO employees
+                (user_id, name, email, phone, subject, department, role)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $user_id,
+                $name,
+                $email,
+                $phone,
+                $subject,
+                $department,
+                $role
+            ]);
+
             $success = "Employee added successfully!";
+
         } else {
-            // Update existing employee
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, phone = ?, subject = ?, 
-                                  department = ?, role = ? WHERE user_id = ?");
-            $stmt->execute([$name, $email, $phone, $subject, $department, $role, $user_id]);
+
+            $stmt = $pdo->prepare("
+                UPDATE employees 
+                SET name = ?, email = ?, phone = ?, subject = ?, department = ?, role = ?
+                WHERE user_id = ?
+            ");
+            $stmt->execute([
+                $name,
+                $email,
+                $phone,
+                $subject,
+                $department,
+                $role,
+                $user_id
+            ]);
+
             $success = "Employee updated successfully!";
         }
-        
+
         $pdo->commit();
-        
+
     } catch (PDOException $e) {
         $pdo->rollBack();
         $error = "Error: " . $e->getMessage();
     }
 }
 
-// Handle edit employee
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['edit_employee'])) {
-    $employee_id = $_POST['employee_id'];
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $phone = $_POST['phone'];
-    $subject = $_POST['subject'];
-    $department = $_POST['department'];
-    $role = $_POST['role'];
-    $user_id = $_POST['user_id'];
-    $user_status = $_POST['user_status'] ?? 'active';
-    
+/* ===========================
+   DELETE EMPLOYEE
+=========================== */
+if (isset($_GET['delete'])) {
+
+    $id = $_GET['delete'];
+
     try {
         $pdo->beginTransaction();
-        
-        // Update employees table
-        $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, phone = ?, subject = ?, 
-                              department = ?, role = ? WHERE id = ?");
-        $stmt->execute([$name, $email, $phone, $subject, $department, $role, $employee_id]);
-        
-        // Update users table - dengan handling jika kolom status belum ada
-        try {
-            $userStmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, role = ?, status = ? WHERE user_id = ?");
-            $userStmt->execute([$name, $email, $role, $user_status, $user_id]);
-        } catch (PDOException $e) {
-            // Jika kolom status belum ada, update tanpa status
-            $userStmt = $pdo->prepare("UPDATE users SET name = ?, email = ?, role = ? WHERE user_id = ?");
-            $userStmt->execute([$name, $email, $role, $user_id]);
-        }
-        
-        $pdo->commit();
-        $success = "Employee updated successfully!";
-        
-    } catch (PDOException $e) {
-        $pdo->rollBack();
-        $error = "Error updating employee: " . $e->getMessage();
-    }
-}
 
-// Handle delete employee
-if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
-    
-    try {
-        // Get user_id first
-        $getStmt = $pdo->prepare("SELECT user_id FROM employees WHERE id = ?");
-        $getStmt->execute([$id]);
-        $employee = $getStmt->fetch();
-        
+        $getUser = $pdo->prepare("
+            SELECT user_id FROM employees WHERE id = ?
+        ");
+        $getUser->execute([$id]);
+        $employee = $getUser->fetch();
+
         if ($employee) {
-            $pdo->beginTransaction();
-            
-            // Delete from employees table
-            $stmt = $pdo->prepare("DELETE FROM employees WHERE id = ?");
-            $stmt->execute([$id]);
-            
-            // Check if user exists in other tables before deleting from users
-            $checkPerm = $pdo->prepare("SELECT COUNT(*) FROM permissions WHERE user_id = ?");
+
+            $pdo->prepare("
+                DELETE FROM employees WHERE id = ?
+            ")->execute([$id]);
+
+            $checkPerm = $pdo->prepare("
+                SELECT COUNT(*) FROM permissions WHERE user_id = ?
+            ");
             $checkPerm->execute([$employee['user_id']]);
-            $hasPermissions = $checkPerm->fetchColumn();
-            
-            // Also check if user has other employee records
-            $checkEmp = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE user_id = ?");
+
+            $checkEmp = $pdo->prepare("
+                SELECT COUNT(*) FROM employees WHERE user_id = ?
+            ");
             $checkEmp->execute([$employee['user_id']]);
-            $hasOtherEmployees = $checkEmp->fetchColumn();
-            
-            // If no permissions and no other employees, delete from users table
-            if ($hasPermissions == 0 && $hasOtherEmployees == 0) {
-                $userStmt = $pdo->prepare("DELETE FROM users WHERE user_id = ?");
-                $userStmt->execute([$employee['user_id']]);
+
+            if ($checkPerm->fetchColumn() == 0 && $checkEmp->fetchColumn() == 0) {
+                $pdo->prepare("
+                    DELETE FROM users WHERE user_id = ?
+                ")->execute([$employee['user_id']]);
             }
-            
-            $pdo->commit();
-            $success = "Employee deleted successfully!";
         }
-        
+
+        $pdo->commit();
+        $success = "Employee deleted successfully!";
+
     } catch (PDOException $e) {
         $pdo->rollBack();
-        $error = "Error deleting employee: " . $e->getMessage();
+        $error = "Delete failed: " . $e->getMessage();
     }
 }
 
-// Handle search - Query yang lebih aman
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$query = "SELECT e.* 
-          FROM employees e 
-          WHERE 1=1";
+/* ===========================
+   SEARCH EMPLOYEE
+=========================== */
+$search = $_GET['search'] ?? '';
+$query = "SELECT * FROM employees WHERE 1=1";
 $params = [];
 
-if (!empty($search)) {
-    $query .= " AND (e.name LIKE ? OR e.user_id LIKE ? OR e.email LIKE ? OR e.role LIKE ? OR e.subject LIKE ? OR e.department LIKE ?)";
-    $searchTerm = "%$search%";
-    $params = array_fill(0, 6, $searchTerm);
+if ($search) {
+    $query .= "
+        AND (
+            name LIKE ? OR
+            user_id LIKE ? OR
+            email LIKE ? OR
+            role LIKE ? OR
+            subject LIKE ? OR
+            department LIKE ?
+        )
+    ";
+    $params = array_fill(0, 6, "%$search%");
 }
 
-$query .= " ORDER BY e.role, e.name";
+$query .= " ORDER BY role, name";
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $employees = $stmt->fetchAll();

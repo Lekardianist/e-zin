@@ -9,11 +9,12 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_permission'])) {
     $permission_type = $_POST['permission_type'];
     $detail_permission = $_POST['detail_permission'];
+    $lecturer_id = $_POST['lecturer_id'];
     $start_date = !empty($_POST['start_date']) ? $_POST['start_date'] : null;
     $end_date = !empty($_POST['end_date']) ? $_POST['end_date'] : null;
     
     // Validation
-    if (empty($permission_type) || empty($detail_permission)) {
+    if (empty($permission_type) || empty($detail_permission) || empty($lecturer_id)) {
         $error = "Please fill in all required fields!";
     } else {
         try {
@@ -61,12 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_permission'])) 
             // If no upload error, proceed with database insert
             if (empty($error)) {
                 $stmt = $pdo->prepare("INSERT INTO permissions 
-                                      (user_id, name, role, permission_type, detail_permission, 
+                                      (user_id, lecturer_id, name, role, permission_type, detail_permission, 
                                        start_date, end_date, attachment_file, file_type, file_size) 
-                                      VALUES (?, ?, 'student', ?, ?, ?, ?, ?, ?, ?)");
+                                      VALUES (?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?)");
                 
                 $stmt->execute([
                     $_SESSION['user_id'],
+                    $lecturer_id,
                     $_SESSION['name'],
                     $permission_type,
                     $detail_permission,
@@ -117,6 +119,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_permission'])) 
             </div>
             <div class="card-body">
                 <form method="POST" action="" enctype="multipart/form-data" id="permissionForm">
+                    <div class="mb-3">
+                        <label class="form-label">Target Lecturer *</label>
+                        <select class="form-select" name="lecturer_id" id="lecturerId" required>
+                            <option value="">Select Lecturer</option>
+                            <?php
+                            try {
+                                $stmt = $pdo->prepare("SELECT user_id, name FROM users WHERE role = 'lecturer' AND status = 'active' ORDER BY name ASC");
+                                $stmt->execute();
+                                $lecturers = $stmt->fetchAll();
+                                foreach($lecturers as $lecturer):
+                            ?>
+                                <option value="<?php echo htmlspecialchars($lecturer['user_id']); ?>">
+                                    <?php echo htmlspecialchars($lecturer['name']); ?>
+                                </option>
+                            <?php 
+                                endforeach;
+                            } catch (PDOException $e) {
+                                echo '<option value="">Error loading lecturers</option>';
+                            }
+                            ?>
+                        </select>
+                        <small class="text-muted">Select the lecturer who will review this permission request</small>
+                    </div>
+                    
                     <div class="mb-3">
                         <label class="form-label">Permission Type *</label>
                         <select class="form-select" name="permission_type" id="permissionType" required>

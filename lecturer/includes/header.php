@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Include database config FIRST before any redirect
 require_once __DIR__ . '/../config/database.php';
@@ -28,14 +30,9 @@ $lecturer_data = $stmt->fetch();
 
 // Get pending count for notification
 $pending_stmt = $pdo->prepare("SELECT COUNT(*) as pending FROM permissions p 
-                              JOIN employees e ON p.user_id = e.user_id 
-                              WHERE e.role = 'student' 
-                              AND (e.department = ? OR e.subject LIKE ?)
+                              WHERE p.lecturer_id = ?
                               AND p.status = 'pending'");
-$pending_stmt->execute([
-    $lecturer_data['department'] ?? '', 
-    '%' . ($lecturer_data['subject'] ?? '') . '%'
-]);
+$pending_stmt->execute([$_SESSION['user_id']]);
 $pending_count = $pending_stmt->fetch()['pending'] ?? 0;
 ?>
 

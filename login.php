@@ -579,7 +579,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="demo-account" data-email="lecturer@university.edu" data-password="lecturer123"
                              style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; cursor: pointer; transition: background 0.3s;">
                             <div style="font-weight: 600; color: white; font-size: 14px;">Lecturer</div>
-                            <div style="font-size: 12px; opacity: 0.9; color: white;">lecturer@university.edu</div>
+                            <div style="font-size: 12px; opacity: 0.9; color: white;">dosen@ezin.com</div>
                         </div>
                     </div>
                 </div>

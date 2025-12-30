@@ -10,6 +10,13 @@ require_once '../config/database.php';
 $stmt = $pdo->prepare("SELECT * FROM employees WHERE user_id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $student = $stmt->fetch();
+
+// Get recent approved/rejected permissions for notification
+$notif_stmt = $pdo->prepare("SELECT id, permission_type, status, created_at AS updated_at FROM permissions 
+                             WHERE user_id = ? AND status IN ('approved', 'rejected')
+                             ORDER BY created_at DESC LIMIT 5");
+$notif_stmt->execute([$_SESSION['user_id']]);
+$recent_updates = $notif_stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -58,6 +65,53 @@ $student = $stmt->fetch();
                     </li>
                 </ul>
                 <div class="navbar-nav">
+                    <div class="nav-item dropdown me-3">
+                        <button class="btn btn-outline-light btn-sm position-relative" 
+                                type="button" data-bs-toggle="dropdown" id="notifBell">
+                            <i class="bi bi-bell"></i>
+                            <?php 
+                            $unread_count = 0;
+                            foreach($recent_updates as $update) {
+                                $unread_count++;
+                            }
+                            if ($unread_count > 0): 
+                            ?>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    <?php echo $unread_count; ?>
+                                </span>
+                            <?php endif; ?>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Notification</h6></li>
+                            <?php if (count($recent_updates) > 0): ?>
+                                <?php foreach($recent_updates as $update): ?>
+                                <li>
+                                    <a class="dropdown-item" href="my_permissions.php">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <i class="bi bi-<?php echo $update['status'] == 'approved' ? 'check-circle text-success' : 'x-circle text-danger'; ?>"></i>
+                                                <strong><?php echo $update['permission_type']; ?></strong> - 
+                                                <span class="badge bg-<?php echo $update['status'] == 'approved' ? 'success' : 'danger'; ?>">
+                                                    <?php echo ucfirst($update['status']); ?>
+                                                </span>
+                                                <br>
+                                                <small class="text-muted"><?php echo date('d M H:i', strtotime($update['updated_at'])); ?></small>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </li>
+                                <?php endforeach; ?>
+                                <li><hr class="dropdown-divider"></li>
+                            <?php else: ?>
+                                <li>
+                                    <a class="dropdown-item text-muted" href="#">
+                                        <i class="bi bi-check-circle text-success"></i> No updates yet
+                                    </a>
+                                </li>
+                            <?php endif; ?>
+                            <li><a class="dropdown-item" href="my_permissions.php">View all permissions</a></li>
+                        </ul>
+                    </div>
                     <div class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userDropdown" data-bs-toggle="dropdown">
                             <i class="bi bi-person"></i> <?php echo $_SESSION['name']; ?>
